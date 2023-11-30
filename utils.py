@@ -5,7 +5,11 @@ Created on Sun Mar 28 01:05:24 2021
 @author: Ranak Roy Chowdhury
 """
 import warnings, pickle, torch, math, os, random, numpy as np
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from torch.utils.data import DataLoader
 
 import multitask_transformer_class
 warnings.filterwarnings("ignore")
@@ -233,8 +237,35 @@ def multitask_train(model, criterion_tar, criterion_task, optimizer, X_train_tar
     return total_loss_tar_masked, total_loss_tar_unmasked, total_loss_task / y_train_task.shape[0], instance_weights
 
 
+def make_predictions(X_test, y_test, model, batch_size):
+    '''
+    FAILING
+    '''
+    test_dl = DataLoader((X_test, y_test), batch_size, shuffle=False)
+    predictions, actuals = list(), list()
 
-def evaluate(y_pred, y, nclasses, criterion, task_type, device, avg):
+    print(test_dl)
+    
+    # for i, (inputs, targets) in enumerate(test_dl):
+    for inputs, times, targets in test_dl:
+        # evaluate the model on the test set
+        print(inputs)
+        yhat = model(inputs, times)
+        # retrieve numpy array
+        yhat = yhat.detach().numpy()
+        actual = targets.numpy()
+        actual = actual.reshape((len(actual), 1))
+        # round to class values
+        yhat = yhat.round()
+        # store
+        predictions.append(yhat)
+        actuals.append(actual)
+    
+    predictions, actuals = np.vstack(predictions), np.vstack(actuals)
+    return predictions, actuals
+
+
+def evaluate(y_pred, y, nclasses, criterion, task_type, device, avg, conf_matrix=False, label_dict=None):
     results = []
 
     if task_type == 'classification':
@@ -248,6 +279,14 @@ def evaluate(y_pred, y, nclasses, criterion, task_type, device, avg):
         f1 = f1_score(target, pred, average = avg)
         
         results.extend([loss, acc, prec, rec, f1])
+
+        if conf_matrix:
+            cf_matrix = confusion_matrix(y, y_pred)
+            df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1)[:, None], index = [i for i in label_dict.keys()],
+                                columns = [i for i in label_dict.keys()])
+            plt.figure(figsize = (12,7))
+            sns.heatmap(df_cm, annot=True)
+    
     else:
         y_pred = y_pred.squeeze()
         y = torch.as_tensor(y, device = device)

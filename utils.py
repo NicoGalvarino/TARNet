@@ -104,12 +104,38 @@ def preprocess(prop, X_train, y_train, X_test, y_test):
     X_train, X_test = mean_standardize_transform(X_train, mean, std), mean_standardize_transform(X_test, mean, std)
 
     num_train_inst, num_test_inst = X_train.shape[0], X_test.shape[0]
-    num_train_samples = math.ceil(num_train_inst / prop['batch']) * prop['batch']
-    num_test_samples = math.ceil(num_test_inst / prop['batch']) * prop['batch']
+    print('num_test_inst =', num_test_inst)
+    # num_train_samples = math.ceil(num_train_inst / prop['batch']) * prop['batch']
+    # num_test_samples = math.ceil(num_test_inst / prop['batch']) * prop['batch']
+
+
+    num_test_samples = math.ceil(num_test_inst / prop['batch'])
+    num_train_samples = math.ceil(num_train_inst / prop['batch'])
+
+    # Create batches
+    for i in range(num_test_samples):
+        start_index = i * prop['batch']
+        end_index = min((i + 1) * prop['batch'], num_test_inst)
+        # Process batch
+        X_test_batch = X_test[start_index:end_index]
+        # Example: Print batch size
+        print(f"Test Batch {i + 1} - Size: {end_index - start_index}")
+
+    for j in range(num_train_samples):
+        start_index = j * prop['batch']
+        end_index = min((j + 1) * prop['batch'], num_train_inst)
+        # Process batch
+        X_train_batch = X_train[start_index:end_index]
+        # Example: Print batch size
+        print(f"Train Batch {j + 1} - Size: {end_index - start_index}")
+
+    # print('batchsize =', prop['batch'])
+    # print('num_test_samples =', num_test_samples)
     
     X_train = make_perfect_batch(X_train, num_train_inst, num_train_samples)
     X_test = make_perfect_batch(X_test, num_test_inst, num_test_samples)
 
+    # print('X_test.shape before torch = ', X_test.shape)
     X_train_task = torch.as_tensor(X_train).float()
     X_test = torch.as_tensor(X_test).float()
 
@@ -189,8 +215,10 @@ def compute_task_loss(nclasses, model, device, criterion_task, y_train_task, bat
 
 
 
-def multitask_train(model, criterion_tar, criterion_task, optimizer, X_train_tar, X_train_task, y_train_tar_masked, y_train_tar_unmasked, \
-                    y_train_task, boolean_indices_masked, boolean_indices_unmasked, prop):
+def multitask_train(model, criterion_tar, criterion_task, optimizer, 
+                    X_train_tar, X_train_task, 
+                    y_train_tar_masked, y_train_tar_unmasked, y_train_task, 
+                    boolean_indices_masked, boolean_indices_unmasked, prop):
     
     model.train() # Turn on the train mode
     total_loss_tar_masked, total_loss_tar_unmasked, total_loss_task = 0.0, 0.0, 0.0
@@ -242,15 +270,17 @@ def make_predictions(X_test, y_test, model, batch_size):
     FAILING
     '''
     test_dl = DataLoader((X_test, y_test), batch_size, shuffle=False)
+    print('test data loader =', test_dl)
     predictions, actuals = list(), list()
 
     print(test_dl)
     
     # for i, (inputs, targets) in enumerate(test_dl):
-    for inputs, times, targets in test_dl:
+    # for inputs, times, targets in test_dl:
+    for inputs, targets in test_dl:
         # evaluate the model on the test set
         print(inputs)
-        yhat = model(inputs, times)
+        yhat = model(inputs)#, times)
         # retrieve numpy array
         yhat = yhat.detach().numpy()
         actual = targets.numpy()
